@@ -6,7 +6,6 @@ package net.steveclewer.cmis.examples;
 public class ExampleBase {
     private String user;
     private String password;
-    private String folderName;
 
 	public static void doUsage(String message) {
 		System.out.println(message);
@@ -28,13 +27,4 @@ public class ExampleBase {
 	public void setUser(String user) {
 		this.user = user;
 	}
-
-	public String getFolderName() {
-		return folderName;
-	}
-
-	public void setFolderName(String folderName) {
-		this.folderName = folderName;
-	}
-
 }
