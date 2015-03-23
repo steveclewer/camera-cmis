@@ -46,11 +46,14 @@ public class CMISExtractAssetsTester extends ExampleBase {
 	
 	public static final String EXTRACT_ASSETS_PATH ="/Data Dictionary/Jobs/Extract Assets";
 	
+	public static final boolean ADD_JOBS_AFTER_UPLOADS = true;
+	
     private String serviceUrl = "http://localhost:8082/alfresco/cmisatom"; // Uncomment for Atom Pub binding
     //private String serviceUrl = "http://localhost:8080/alfresco/cmis"; // Uncomment for Web Services binding
     //private String serviceUrl = "http://localhost:8080/alfresco/api/-default-/public/cmis/versions/1.0/atom"; // Uncomment for Atom Pub binding
     //private String serviceUrl = "http://localhost:8080/alfresco/api/-default-/public/cmis/versions/cmisws"; // Uncomment for Web Services binding
 	//private String serviceUrl = "http://jpotts.alfresco-laptop.com:8081/chemistry/browser";
+
     private Session session = null;
 
 	public Session getSession() {
@@ -67,14 +70,10 @@ public class CMISExtractAssetsTester extends ExampleBase {
 			params.put(SessionParameter.ATOMPUB_URL, serviceUrl); // Uncomment for Atom Pub binding
 			params.put(SessionParameter.BINDING_TYPE, BindingType.ATOMPUB.value()); // Uncomment for Atom Pub binding
 			
-			// Set the alfresco object factory
-			// Used when using the CMIS extension for Alfresco for working with aspects
+			// Set the alfresco object factory. Used when using the CMIS extension for Alfresco for working with aspects
 			params.put(SessionParameter.OBJECT_FACTORY_CLASS, "org.alfresco.cmis.client.impl.AlfrescoObjectFactoryImpl");
 
-			System.out.println(params);
-			
 			List<Repository> repositories = factory.getRepositories(params);
-
 			this.session = repositories.get(0).createSession();
 		}
 
@@ -94,7 +93,6 @@ public class CMISExtractAssetsTester extends ExampleBase {
 		String timeStamp = new Long(System.currentTimeMillis()).toString();
 		
 		String zipFileName = timeStamp + "_" + suffix;
-		
 				
 		try {
 			Map <String, Object> props = new HashMap<String, Object>();
@@ -104,15 +102,14 @@ public class CMISExtractAssetsTester extends ExampleBase {
 					
 			File sourceFile = new File(sourceZip);		
 
-			InputStream fis = new FileInputStream(sourceFile);
-			VersioningState vs = VersioningState.MAJOR;
-			DataInputStream dis = new DataInputStream(fis);
+			DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile));
 			byte[] bytes = new byte[(int) sourceFile.length()];
 			dis.readFully(bytes);
-			//ContentStream zipContentStream = new ContentStreamImpl(sourceFile.getAbsolutePath(), null, "application/zip", new ByteArrayInputStream(bytes));			
 			ContentStream zipContentStream = session.getObjectFactory().createContentStream(sourceFile.getAbsolutePath(), Long.valueOf(bytes.length), ZIP_TYPE, new ByteArrayInputStream(bytes));
 			
-			Document zipDoc = zipParent.createDocument(props, zipContentStream, vs);
+			Document zipDoc = zipParent.createDocument(props, zipContentStream, VersioningState.MAJOR);
+			
+			dis.close();
 			
 			return zipDoc;
 		} catch (Exception e) {
@@ -133,14 +130,16 @@ public class CMISExtractAssetsTester extends ExampleBase {
 			String zipRef = (String)zipDocument.getPropertyValue("alfcmis:nodeRef");		
 	
 			Map <String, Object> properties = new HashMap<String, Object>();
-			properties.put(PropertyIds.OBJECT_TYPE_ID, "D:bulkload:extractAssetsJob,P:bulkload:jobStatus");		
+			properties.put(PropertyIds.OBJECT_TYPE_ID, "D:bulkload:extractAssetsJob,P:bulkload:jobStatus,P:cm:titled");		
 			properties.put(PropertyIds.NAME, jobFileName);
-			properties.put(PropertyIds.DESCRIPTION, "This is a test job via CMIS");		
+			properties.put(PropertyIds.DESCRIPTION, "This is a test job submitted via CMIS");		
 			properties.put("bulkload:jobStatusMessage", "CMIS test extraction.");
 			properties.put("bulkload:jobStatus", STATUS_PENDING);
 			properties.put("bulkload:compressedFilename", zipDoc.getName());
 			properties.put("bulkload:compressedFilePath", "/Company Home" + uploadPath);
 			properties.put("bulkload:compressedFileRef", zipRef);	
+			properties.put("cm:description", "This is a test job submitted via CMIS");	
+			properties.put("cm:title", "CMIS extract");
 			
 			String docText = "This is a sample " + TEXT_TYPE + " document called " + jobFileName;
 			byte[] content = docText.getBytes();
@@ -166,15 +165,13 @@ public class CMISExtractAssetsTester extends ExampleBase {
 		
 		List<String> uploadFolders = new ArrayList<String>();
 		uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip");
-		uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip2");
-		uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip3");
-		uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip4");
+		//uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip2");
+		//uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip3");
+		//uploadFolders.add("/Sites/steve-cpa-site/documentLibrary/wip4");
 		
 		final String testDir = "C:/Users/sclewer/Desktop/CENGAGE/zip extract test files/cpa/auto/";
-		int jobCount = 1;
-		
-		boolean addJobsAfterUploads = true;
-		
+		int jobCount = 1;		
+	
 		List<ExtractJob> extractJobs = new ArrayList<ExtractJob>();
             
 		try {      
@@ -182,8 +179,6 @@ public class CMISExtractAssetsTester extends ExampleBase {
 			String[] files = f.list();
 
 			for (int i = 0; i < jobCount; i++) {
-				System.out.println("\nCreating upload " + i + " of " + jobCount + "...");
-
 				for (String uploadFolder : uploadFolders) {
 					for (String file : files) {	    
 						final String sourceZip = testDir + file;
@@ -191,7 +186,7 @@ public class CMISExtractAssetsTester extends ExampleBase {
 							System.out.println("\nUploading ==> " + file + " to " + uploadFolder);
 							Document zipDoc = extractAssetsTester.uploadExtractionZip(uploadFolder, sourceZip, file);
 							if (zipDoc != null) {
-								if (addJobsAfterUploads) {
+								if (ADD_JOBS_AFTER_UPLOADS) {
 									ExtractJob job = new ExtractJob();
 									job.setUploadFolder(uploadFolder);
 									job.setZipDoc(zipDoc);	
